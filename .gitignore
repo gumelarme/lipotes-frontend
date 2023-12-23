@@ -1,6 +1,11 @@
 # Elm
 elm-stuff
 
+
+# envs
+.env*
+src/Env.elm
+
 # Logs
 logs
 *.log
