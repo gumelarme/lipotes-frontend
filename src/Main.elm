@@ -8,7 +8,7 @@ import Html.Attributes exposing (class)
 import Html.Attributes exposing (hidden)
 import Html exposing (button)
 import Http
-import Json.Decode exposing (Decoder, map, map3, field, string, list)
+import Json.Decode exposing (Decoder, map3, field, string, list)
 
 
 
@@ -23,7 +23,7 @@ subscriptions _ =
 
 type  Model
     = Loading
-    | Success (Data SampleText)
+    | Success (List SampleText)
 
 
 
@@ -33,7 +33,7 @@ init _ =
 
 
 type Msg =
-    GotData (Result Http.Error (Data SampleText))
+    GotData (Result Http.Error (List SampleText))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -76,7 +76,7 @@ viewSelectTextPreset  model =
     select [ class "select select-md rounded-none" ]
         (option [ hidden True ] [text "Sample Text"]
         :: case model of
-              Success res -> List.map createOption res.data
+              Success res -> List.map createOption res
               Loading -> []
         )
 
@@ -90,20 +90,18 @@ getSampleText : Cmd Msg
 getSampleText =
     Http.get
         { url = Api.endpoint "/texts"
-        , expect = Http.expectJson GotData (dataDecoder textDecoder) }
+        , expect = Http.expectJson GotData textDecoder }
 
 
-type alias Data a = {data: List a}
-
-dataDecoder : Decoder a -> Decoder (Data a)
+dataDecoder : Decoder a -> Decoder (List a)
 dataDecoder decoder =
-    map Data
-        (field "data" (list decoder))
+    (field "data" (list decoder))
 
 
-textDecoder: Decoder SampleText
+textDecoder : Decoder (List SampleText)
 textDecoder =
-    map3 SampleText
+    dataDecoder
+    (map3 SampleText
         (field "id" string)
         (field "title" string)
-        (field "text" string)
+        (field "text" string))
