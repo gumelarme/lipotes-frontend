@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import Api
 import Browser
 import List
 import Html exposing (Html, div, text, select, option)
@@ -8,7 +9,6 @@ import Html.Attributes exposing (hidden)
 import Html exposing (button)
 import Http
 import Json.Decode exposing (Decoder, map, map3, field, string, list)
-import Env
 
 
 
@@ -73,12 +73,12 @@ type alias SampleText =
 
 viewSelectTextPreset: Model -> Html Msg
 viewSelectTextPreset  model =
-    case model of
-        Success res ->
-          select [ class "select select-md rounded-none" ]
-              (option [ hidden True ] [text "Sample Text"]
-              :: (List.map createOption res.data))
-        Loading -> div [] []
+    select [ class "select select-md rounded-none" ]
+        (option [ hidden True ] [text "Sample Text"]
+        :: case model of
+              Success res -> List.map createOption res.data
+              Loading -> []
+        )
 
 
 createOption: SampleText -> Html Msg
@@ -89,7 +89,7 @@ createOption model =
 getSampleText : Cmd Msg
 getSampleText =
     Http.get
-        { url = Env.hzm_api_url ++ "/texts"
+        { url = Api.endpoint "/texts"
         , expect = Http.expectJson GotData (dataDecoder textDecoder) }
 
 
