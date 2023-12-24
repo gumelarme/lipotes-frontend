@@ -124,7 +124,13 @@ viewSelectTextPreset model =
 viewTextArea : Model -> Html Msg
 viewTextArea model =
     div [ class "flex relative h-40" ]
-        [ textarea [ class "grow", placeholder "Type something" ] [ text model.inputText ]
+        [ textarea
+            [ class "grow p-2 text-xl"
+            , placeholder "Type something..."
+            , value model.inputText
+            , onInput SetInputText
+            ]
+            []
         , button [ class "btn btn-sm btn-primary absolute right-4 bottom-4", onClick TriggerAnalyze ] [ text "Analyze" ]
         ]
 
