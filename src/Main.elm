@@ -2,8 +2,9 @@ module Main exposing (..)
 
 import Api
 import Browser
-import Html exposing (Html, button, div, option, select, text)
-import Html.Attributes exposing (class, hidden)
+import Html exposing (Html, button, div, option, select, text, textarea)
+import Html.Attributes exposing (class, hidden, placeholder, value)
+import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, list, map3, string)
 import List
@@ -18,36 +19,81 @@ subscriptions _ =
     Sub.none
 
 
-type Model
+type alias Model =
+    { sampleTexts : Status (List SampleText)
+    , inputText : String
+    }
+
+
+type Status a
     = Loading
-    | Success (List SampleText)
+    | Success a
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Loading, getSampleText )
+    ( { sampleTexts = Loading
+      , inputText = ""
+      }
+    , getSampleTexts
+    )
 
 
 type Msg
-    = GotData (Result Http.Error (List SampleText))
+    = GotSampleTexts (Result Http.Error (List SampleText))
+    | SetInputText String
+    | SampleTextSelected String
+    | TriggerAnalyze
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        GotData result ->
+        SampleTextSelected key ->
+            let
+                sampleText =
+                    case model.sampleTexts of
+                        Success texts ->
+                            List.filter (\x -> x.id == key) texts
+
+                        Loading ->
+                            []
+
+                text =
+                    case List.head sampleText of
+                        Just a ->
+                            a.text
+
+                        Nothing ->
+                            ""
+            in
+            update (SetInputText text) model
+
+        SetInputText text ->
+            ( { model | inputText = text }, Cmd.none )
+
+        GotSampleTexts result ->
             case result of
                 Ok data ->
-                    ( Success data, Cmd.none )
+                    ( { model | sampleTexts = Success data }, Cmd.none )
 
                 Err _ ->
-                    ( Loading, Cmd.none )
+                    ( { model | sampleTexts = Loading }, Cmd.none )
+
+        TriggerAnalyze ->
+            let
+                _ =
+                    Debug.log model.inputText ""
+            in
+            ( model, Cmd.none )
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ viewHeader model ]
+        [ viewHeader model
+        , div [] [ viewTextArea model ]
+        ]
 
 
 viewHeader : Model -> Html Msg
@@ -61,18 +107,11 @@ viewHeader model =
         ]
 
 
-type alias SampleText =
-    { id : String
-    , title : String
-    , content : String
-    }
-
-
 viewSelectTextPreset : Model -> Html Msg
 viewSelectTextPreset model =
-    select [ class "select select-md rounded-none" ]
+    select [ class "select select-md rounded-none", onInput SampleTextSelected ]
         (option [ hidden True ] [ text "Sample Text" ]
-            :: (case model of
+            :: (case model.sampleTexts of
                     Success res ->
                         List.map createOption res
 
@@ -82,16 +121,31 @@ viewSelectTextPreset model =
         )
 
 
+viewTextArea : Model -> Html Msg
+viewTextArea model =
+    div [ class "flex relative h-40" ]
+        [ textarea [ class "grow", placeholder "Type something" ] [ text model.inputText ]
+        , button [ class "btn btn-sm btn-primary absolute right-4 bottom-4", onClick TriggerAnalyze ] [ text "Analyze" ]
+        ]
+
+
 createOption : SampleText -> Html Msg
 createOption model =
-    option [] [ text model.title ]
+    option [ value model.id ] [ text model.title ]
 
 
-getSampleText : Cmd Msg
-getSampleText =
+type alias SampleText =
+    { id : String
+    , title : String
+    , text : String
+    }
+
+
+getSampleTexts : Cmd Msg
+getSampleTexts =
     Http.get
         { url = Api.endpoint "/texts"
-        , expect = Http.expectJson GotData textDecoder
+        , expect = Http.expectJson GotSampleTexts textDecoder
         }
 
 
