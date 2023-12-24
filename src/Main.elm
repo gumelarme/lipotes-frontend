@@ -2,9 +2,9 @@ module Main exposing (..)
 
 import Api
 import Browser
-import Html exposing (Html, button, div, option, select, text, textarea)
-import Html.Attributes exposing (class, hidden, placeholder, value)
-import Html.Events exposing (onClick, onInput)
+import Html exposing (Html, button, div, input, label, option, select, text, textarea)
+import Html.Attributes exposing (checked, class, classList, hidden, placeholder, type_, value)
+import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, list, map3, string)
 import List
@@ -22,6 +22,7 @@ subscriptions _ =
 type alias Model =
     { sampleTexts : Status (List SampleText)
     , inputText : String
+    , visibility : Visibility
     }
 
 
@@ -34,6 +35,7 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { sampleTexts = Loading
       , inputText = ""
+      , visibility = Smart
       }
     , getSampleTexts
     )
@@ -44,6 +46,7 @@ type Msg
     | SetInputText String
     | SampleTextSelected String
     | TriggerAnalyze
+    | VisibilityChanged Visibility
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -87,12 +90,15 @@ update msg model =
             in
             ( model, Cmd.none )
 
+        VisibilityChanged visibility ->
+            ( { model | visibility = visibility }, Cmd.none )
+
 
 view : Model -> Html Msg
 view model =
     div []
         [ viewHeader model
-        , div [] [ viewTextArea model ]
+        , div [] [ viewMenu model, viewTextArea model ]
         ]
 
 
@@ -132,6 +138,58 @@ viewTextArea model =
             ]
             []
         , button [ class "btn btn-sm btn-primary absolute right-4 bottom-4", onClick TriggerAnalyze ] [ text "Analyze" ]
+        ]
+
+
+viewMenu : Model -> Html Msg
+viewMenu model =
+    div [ class "flex font-bold text-xl h-12 items-stretch bg-blue-800" ]
+        [ viewBlacklistButton
+        , div [ class "grow" ] []
+        , viewVisibilityMenu model
+        ]
+
+
+viewBlacklistButton : Html Msg
+viewBlacklistButton =
+    button [ class "px-2 bg-white text-black" ]
+        [ text "Blacklist" ]
+
+
+type Visibility
+    = Smart
+    | HideAll
+    | ShowAll
+
+
+visibilityOptions : List ( Visibility, String )
+visibilityOptions =
+    [ ( HideAll, "Hide All" )
+    , ( Smart, "Smart" )
+    , ( ShowAll, "Show All" )
+    ]
+
+
+viewVisibilityMenu : Model -> Html Msg
+viewVisibilityMenu model =
+    div [ class "flex h-full" ]
+        (List.map (\x -> menuRadio x (model.visibility == Tuple.first x)) visibilityOptions)
+
+
+menuRadio : ( Visibility, String ) -> Bool -> Html Msg
+menuRadio menu isChecked =
+    label
+        [ class "flex items-center px-2 text-white font-bold hover:cursor-pointer"
+        , classList [ ( "bg-white text-black", isChecked ) ]
+        ]
+        [ input
+            [ type_ "radio"
+            , checked isChecked
+            , onCheck (\_ -> VisibilityChanged (Tuple.first menu))
+            , hidden True
+            ]
+            []
+        , text (Tuple.second menu)
         ]
 
 
