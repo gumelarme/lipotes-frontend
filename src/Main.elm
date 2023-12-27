@@ -6,8 +6,9 @@ import Html exposing (Html, button, div, form, h2, input, label, node, option, p
 import Html.Attributes exposing (checked, class, classList, hidden, id, method, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
-import Json.Decode exposing (Decoder, field, list, map3, string)
+import Json.Decode exposing (Decoder, field, list, map3, map4, string)
 import List
+import List.Extra as Extra
 
 
 main : Program () Model Msg
@@ -21,9 +22,10 @@ subscriptions _ =
 
 
 type alias Model =
-    { sampleTexts : Status (List SampleText)
-    , inputText : String
+    { inputText : String
     , visibility : Visibility
+    , sampleTexts : Status (List SampleText)
+    , collections : Status (List ( Collection, Bool ))
     }
 
 
@@ -32,13 +34,24 @@ type Status a
     | Success a
 
 
+withDefault : Status a -> a -> a
+withDefault unknownData defaultValue =
+    case unknownData of
+        Success a ->
+            a
+
+        _ ->
+            defaultValue
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { sampleTexts = Loading
+      , collections = Loading
       , inputText = ""
       , visibility = Smart
       }
-    , getSampleTexts
+    , Cmd.batch [ getSampleTexts, getCollections ]
     )
 
 
@@ -59,8 +72,10 @@ modalIdStr id =
 
 type Msg
     = GotSampleTexts (Result Http.Error (List SampleText))
+    | GotCollections (Result Http.Error (List Collection))
     | SetInputText String
     | SampleTextSelected String
+    | CollectionSelectionChanged String Bool
     | TriggerAnalyze
     | VisibilityChanged Visibility
     | ToggleModal ModalId
@@ -113,6 +128,30 @@ update msg model =
         ToggleModal modalId ->
             ( model, toggleDialog (modalIdStr modalId) )
 
+        GotCollections result ->
+            case result of
+                Ok data ->
+                    ( { model | collections = Success (List.map (\x -> ( x, True )) data) }, Cmd.none )
+
+                Err _ ->
+                    ( { model | collections = Loading }, Cmd.none )
+
+        CollectionSelectionChanged collId isChecked ->
+            let
+                collections =
+                    withDefault model.collections []
+
+                toggleStatus pair =
+                    if (Tuple.first pair).id == collId then
+                        ( Tuple.first pair, isChecked )
+
+                    else
+                        pair
+            in
+            ( { model | collections = Success (List.map toggleStatus collections) }
+            , Cmd.none
+            )
+
 
 view : Model -> Html Msg
 view model =
@@ -160,16 +199,54 @@ modalControl model modalId title content =
 
 
 viewModalBlacklist : Model -> Html Msg
-viewModalBlacklist _ =
+viewModalBlacklist model =
     div []
         [ div [ class "p-2" ]
-            [ p [] [ text "Some content" ] ]
+            [ viewCollectionList model ]
         , div [ class "flex gap-2" ]
             [ button [ class "btn btn-primary", onClick (ToggleModal ModalBlacklist) ]
                 [ text "OK" ]
             , button [ class "btn btn-error", onClick (ToggleModal ModalBlacklist) ]
                 [ text "Cancel" ]
             ]
+        ]
+
+
+viewCollectionList : Model -> Html Msg
+viewCollectionList model =
+    let
+        collections =
+            withDefault model.collections []
+
+        divider =
+            List.repeat (List.length collections) (div [ class "h-1.5" ] [ text "" ])
+
+        createCard coll =
+            viewCollectionItem (Tuple.first coll) (Tuple.second coll)
+
+        collectionCards =
+            List.map createCard collections
+
+        combined =
+            Extra.interweave collectionCards divider
+    in
+    div [] (List.take (List.length combined - 1) combined)
+
+
+viewCollectionItem : Collection -> Bool -> Html Msg
+viewCollectionItem collection state =
+    div [ class "flex items-center bg-gray-800 p-4 hover:bg-gray-900" ]
+        [ div [ class "grow flex flex-col" ]
+            [ h2 [ class "text-2xl" ] [ text collection.name ]
+            , p [ class "" ] [ text "description" ]
+            ]
+        , input
+            [ type_ "checkbox"
+            , class "toggle"
+            , checked state
+            , onCheck (CollectionSelectionChanged collection.id)
+            ]
+            []
         ]
 
 
@@ -303,3 +380,45 @@ textDecoder =
             (field "title" string)
             (field "text" string)
         )
+
+
+type alias Lexeme =
+    { id : String
+    , zh_sc : String
+    , zh_tc : String
+    , pinyin : String
+    }
+
+
+lexemeDecoder : Decoder Lexeme
+lexemeDecoder =
+    map4 Lexeme
+        (field "id" string)
+        (field "zh_sc" string)
+        (field "zh_tc" string)
+        (field "pinyin" string)
+
+
+type alias Collection =
+    { id : String
+    , name : String
+    , preview : List Lexeme
+    }
+
+
+collectionDecoder : Decoder (List Collection)
+collectionDecoder =
+    dataDecoder
+        (map3 Collection
+            (field "id" string)
+            (field "name" string)
+            (field "preview" (list lexemeDecoder))
+        )
+
+
+getCollections : Cmd Msg
+getCollections =
+    Http.get
+        { url = Api.endpoint "/collections"
+        , expect = Http.expectJson GotCollections collectionDecoder
+        }
