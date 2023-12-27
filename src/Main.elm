@@ -8,7 +8,7 @@ import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, list, map3, map4, string)
 import List
-import List.Extra as Extra
+import List.Extra
 
 
 main : Program () Model Msg
@@ -131,7 +131,7 @@ update msg model =
         GotCollections result ->
             case result of
                 Ok data ->
-                    ( { model | collections = Success (List.map (\x -> ( x, True )) data) }, Cmd.none )
+                    ( { model | collections = Success (List.map (\x -> ( x, False )) data) }, Cmd.none )
 
                 Err _ ->
                     ( { model | collections = Loading }, Cmd.none )
@@ -185,14 +185,15 @@ modal model modalId title content =
 
 modalControl : Model -> ModalId -> String -> (Model -> Html Msg) -> Html Msg
 modalControl model modalId title content =
-    div []
+    div [ class "flex flex-col gap-4" ]
         [ div []
-            [ h2 [ class "grow font-bold text-xl" ] [ text title ]
+            [ h2 [ class "grow font-bold text-2xl" ] [ text title ]
             , button
-                [ class "btn btn-sm btn-circle btn-ghost absolute top-2 right-2"
+                [ class "btn btn-md btn-circle btn-ghost absolute top-3 right-3"
                 , onClick (ToggleModal modalId)
                 ]
-                [ text "x" ]
+                -- Change to icon
+                [ text "X" ]
             ]
         , content model
         ]
@@ -200,12 +201,12 @@ modalControl model modalId title content =
 
 viewModalBlacklist : Model -> Html Msg
 viewModalBlacklist model =
-    div []
-        [ div [ class "p-2" ]
+    div [ class "flex flex-col gap-4" ]
+        [ div [ class "h-[74vh] overflow-y-scroll" ]
             [ viewCollectionList model ]
         , div [ class "flex gap-2" ]
             [ button [ class "btn btn-primary", onClick (ToggleModal ModalBlacklist) ]
-                [ text "OK" ]
+                [ text "Ok" ]
             , button [ class "btn btn-error", onClick (ToggleModal ModalBlacklist) ]
                 [ text "Cancel" ]
             ]
@@ -228,14 +229,14 @@ viewCollectionList model =
             List.map createCard collections
 
         combined =
-            Extra.interweave collectionCards divider
+            List.Extra.interweave collectionCards divider
     in
     div [] (List.take (List.length combined - 1) combined)
 
 
 viewCollectionItem : Collection -> Bool -> Html Msg
 viewCollectionItem collection state =
-    div [ class "flex items-center bg-gray-800 p-4 hover:bg-gray-900" ]
+    div [ class "flex items-center bg-gray-800 p-4 hover:bg-gray-900 rounded" ]
         [ div [ class "grow flex flex-col" ]
             [ h2 [ class "text-2xl" ] [ text collection.name ]
             , p [ class "" ] [ text "description" ]
