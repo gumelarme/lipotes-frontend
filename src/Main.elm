@@ -2,7 +2,7 @@ port module Main exposing (..)
 
 import Api
 import Browser
-import Html exposing (Attribute, Html, button, div, form, h2, input, label, node, option, p, select, text, textarea)
+import Html exposing (Html, button, div, form, h2, input, label, node, option, p, select, text, textarea)
 import Html.Attributes exposing (checked, class, classList, hidden, id, method, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
@@ -42,13 +42,28 @@ init _ =
     )
 
 
+type ModalId
+    = ModalBlacklist
+    | ModalAbout
+
+
+modalIdStr : ModalId -> String
+modalIdStr id =
+    case id of
+        ModalBlacklist ->
+            "blacklist-modal"
+
+        ModalAbout ->
+            "about-modal"
+
+
 type Msg
     = GotSampleTexts (Result Http.Error (List SampleText))
     | SetInputText String
     | SampleTextSelected String
     | TriggerAnalyze
     | VisibilityChanged Visibility
-    | ToggleBlacklistModal
+    | ToggleModal ModalId
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -95,8 +110,8 @@ update msg model =
         VisibilityChanged visibility ->
             ( { model | visibility = visibility }, Cmd.none )
 
-        ToggleBlacklistModal ->
-            ( model, toggleDialog modalIdBlacklist )
+        ToggleModal modalId ->
+            ( model, toggleDialog (modalIdStr modalId) )
 
 
 view : Model -> Html Msg
@@ -104,14 +119,8 @@ view model =
     div []
         [ viewHeader model
         , div [] [ viewMenu model, viewTextArea model ]
-        , dialog modalIdBlacklist
-            [ class "modal" ]
-            [ form [ method "dialog", class "modal-backdrop" ]
-                [ button [] [ text "close" ] ]
-            , div
-                [ class "modal-box" ]
-                [ viewModalBlacklist model ]
-            ]
+        , modal model ModalBlacklist "Blacklist" viewModalBlacklist
+        , modal model ModalAbout "About" viewModalAbout
         ]
 
 
@@ -123,31 +132,51 @@ dialog elementId attr content =
     node "dialog" (id elementId :: attr) content
 
 
-modalIdBlacklist : String
-modalIdBlacklist =
-    "blacklist-modal"
+modal : Model -> ModalId -> String -> (Model -> Html Msg) -> Html Msg
+modal model modalId title content =
+    dialog (modalIdStr modalId)
+        [ class "modal" ]
+        [ form [ method "dialog", class "modal-backdrop" ]
+            [ button [] [ text "close" ] ]
+        , div
+            [ class "modal-box" ]
+            [ modalControl model modalId title content ]
+        ]
+
+
+modalControl : Model -> ModalId -> String -> (Model -> Html Msg) -> Html Msg
+modalControl model modalId title content =
+    div []
+        [ div []
+            [ h2 [ class "grow font-bold text-xl" ] [ text title ]
+            , button
+                [ class "btn btn-sm btn-circle btn-ghost absolute top-2 right-2"
+                , onClick (ToggleModal modalId)
+                ]
+                [ text "x" ]
+            ]
+        , content model
+        ]
 
 
 viewModalBlacklist : Model -> Html Msg
 viewModalBlacklist _ =
     div []
-        [ div []
-            [ h2 [ class "grow font-bold text-xl" ] [ text "Blacklist" ]
-            , button
-                [ class "btn btn-sm btn-circle btn-ghost absolute top-2 right-2"
-                , onClick ToggleBlacklistModal
-                ]
-                [ text "x" ]
-            ]
-        , div [ class "p-2" ]
+        [ div [ class "p-2" ]
             [ p [] [ text "Some content" ] ]
         , div [ class "flex gap-2" ]
-            [ button [ class "btn btn-primary", onClick ToggleBlacklistModal ]
+            [ button [ class "btn btn-primary", onClick (ToggleModal ModalBlacklist) ]
                 [ text "OK" ]
-            , button [ class "btn btn-error", onClick ToggleBlacklistModal ]
+            , button [ class "btn btn-error", onClick (ToggleModal ModalBlacklist) ]
                 [ text "Cancel" ]
             ]
         ]
+
+
+viewModalAbout : a -> Html msg
+viewModalAbout _ =
+    div []
+        [ text "About us" ]
 
 
 viewHeader : Model -> Html Msg
@@ -156,7 +185,7 @@ viewHeader model =
         [ div [ class "grow text-2xl font-bold" ] [ text "Hanzi Memo" ]
         , div [ class "flex items-center gap-5" ]
             [ viewSelectTextPreset model
-            , button [] [ text "About" ]
+            , button [ onClick (ToggleModal ModalAbout) ] [ text "About" ]
             ]
         ]
 
@@ -200,7 +229,7 @@ viewMenu model =
 
 viewBlacklistButton : Html Msg
 viewBlacklistButton =
-    button [ class "px-2 bg-white text-black", onClick ToggleBlacklistModal ]
+    button [ class "px-2 bg-white text-black", onClick (ToggleModal ModalBlacklist) ]
         [ text "Blacklist" ]
 
 
