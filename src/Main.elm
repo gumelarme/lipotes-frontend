@@ -1,15 +1,16 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Api
 import Browser
-import Html exposing (Html, button, div, input, label, option, select, text, textarea)
-import Html.Attributes exposing (checked, class, classList, hidden, placeholder, type_, value)
+import Html exposing (Attribute, Html, button, div, form, h2, input, label, node, option, p, select, text, textarea)
+import Html.Attributes exposing (checked, class, classList, hidden, id, method, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, list, map3, string)
 import List
 
 
+main : Program () Model Msg
 main =
     Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
 
@@ -47,6 +48,7 @@ type Msg
     | SampleTextSelected String
     | TriggerAnalyze
     | VisibilityChanged Visibility
+    | ToggleBlacklistModal
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -93,12 +95,58 @@ update msg model =
         VisibilityChanged visibility ->
             ( { model | visibility = visibility }, Cmd.none )
 
+        ToggleBlacklistModal ->
+            ( model, toggleDialog modalIdBlacklist )
+
 
 view : Model -> Html Msg
 view model =
     div []
         [ viewHeader model
         , div [] [ viewMenu model, viewTextArea model ]
+        , dialog modalIdBlacklist
+            [ class "modal" ]
+            [ form [ method "dialog", class "modal-backdrop" ]
+                [ button [] [ text "close" ] ]
+            , div
+                [ class "modal-box" ]
+                [ viewModalBlacklist model ]
+            ]
+        ]
+
+
+port toggleDialog : String -> Cmd msg
+
+
+dialog : String -> List (Html.Attribute msg) -> List (Html msg) -> Html msg
+dialog elementId attr content =
+    node "dialog" (id elementId :: attr) content
+
+
+modalIdBlacklist : String
+modalIdBlacklist =
+    "blacklist-modal"
+
+
+viewModalBlacklist : Model -> Html Msg
+viewModalBlacklist _ =
+    div []
+        [ div []
+            [ h2 [ class "grow font-bold text-xl" ] [ text "Blacklist" ]
+            , button
+                [ class "btn btn-sm btn-circle btn-ghost absolute top-2 right-2"
+                , onClick ToggleBlacklistModal
+                ]
+                [ text "x" ]
+            ]
+        , div [ class "p-2" ]
+            [ p [] [ text "Some content" ] ]
+        , div [ class "flex gap-2" ]
+            [ button [ class "btn btn-primary", onClick ToggleBlacklistModal ]
+                [ text "OK" ]
+            , button [ class "btn btn-error", onClick ToggleBlacklistModal ]
+                [ text "Cancel" ]
+            ]
         ]
 
 
@@ -152,7 +200,7 @@ viewMenu model =
 
 viewBlacklistButton : Html Msg
 viewBlacklistButton =
-    button [ class "px-2 bg-white text-black" ]
+    button [ class "px-2 bg-white text-black", onClick ToggleBlacklistModal ]
         [ text "Blacklist" ]
 
 

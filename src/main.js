@@ -1,6 +1,15 @@
 import './style.css'
 import { Elm } from './Main.elm'
 
-Elm.Main.init({
+const app = Elm.Main.init({
   node: document.querySelector("main"),
+})
+
+app.ports.toggleDialog.subscribe(id => {
+  const dialog = document.querySelector(`#${id}`)
+  if(dialog.open){
+    dialog.close()
+  }else{
+    dialog.showModal()
+  }
 })
