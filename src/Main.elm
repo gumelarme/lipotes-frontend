@@ -1,14 +1,15 @@
-port module Main exposing (..)
+module Main exposing (..)
 
 import Api
 import Browser
-import Html exposing (Html, button, div, form, h2, input, label, node, option, p, select, text, textarea)
+import Html exposing (Html, button, div, form, h2, input, label, node, option, p, select, span, text, textarea)
 import Html.Attributes exposing (checked, class, classList, hidden, id, method, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, list, map3, map4, string)
 import List
 import List.Extra
+import Port
 
 
 main : Program () Model Msg
@@ -126,7 +127,7 @@ update msg model =
             ( { model | visibility = visibility }, Cmd.none )
 
         ToggleModal modalId ->
-            ( model, toggleDialog (modalIdStr modalId) )
+            ( model, Port.toggleDialog (modalIdStr modalId) )
 
         GotCollections result ->
             case result of
@@ -161,9 +162,6 @@ view model =
         , modal model ModalBlacklist "Blacklist" viewModalBlacklist
         , modal model ModalAbout "About" viewModalAbout
         ]
-
-
-port toggleDialog : String -> Cmd msg
 
 
 dialog : String -> List (Html.Attribute msg) -> List (Html msg) -> Html msg
@@ -231,7 +229,15 @@ viewCollectionList model =
         combined =
             List.Extra.interweave collectionCards divider
     in
-    div [] (List.take (List.length combined - 1) combined)
+    case model.collections of
+        Success _ ->
+            div [] (List.take (List.length combined - 1) combined)
+
+        Loading ->
+            div [ class "h-full w-full flex flex-col gap-4 justify-center items-center" ]
+                [ span [ class "loading loading-spinner text-primary loading-lg" ] []
+                , span [ class "text-xl" ] [ text "Loading..." ]
+                ]
 
 
 viewCollectionItem : Collection -> Bool -> Html Msg
