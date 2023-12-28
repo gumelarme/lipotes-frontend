@@ -37,9 +37,9 @@ type Status a
     | Success a
 
 
-withDefault : Status a -> a -> a
-withDefault unknownData defaultValue =
-    case unknownData of
+withDefault : a -> Status a -> a
+withDefault defaultValue status =
+    case status of
         Success a ->
             a
 
@@ -148,7 +148,7 @@ update msg model =
         CollectionSelectionChanged collId isChecked ->
             let
                 collections =
-                    withDefault model.collections []
+                    withDefault [] model.collections
 
                 toggleStatus pair =
                     if (Tuple.first pair).id == collId then
@@ -164,7 +164,7 @@ update msg model =
         OpenBlacklistModal ->
             let
                 collectionStates =
-                    List.map (Tuple.mapFirst (\x -> x.id)) (withDefault model.collections [])
+                    List.map (Tuple.mapFirst (\x -> x.id)) (withDefault [] model.collections)
             in
             update (ToggleModal ModalBlacklist) { model | modalPrevSelectedCollection = Dict.fromList collectionStates }
 
@@ -174,7 +174,7 @@ update msg model =
                     Maybe.withDefault state (Dict.get id model.modalPrevSelectedCollection)
 
                 previousStates =
-                    List.map (\( coll, state ) -> ( coll, getPrevState coll state )) (withDefault model.collections [])
+                    List.map (\( coll, state ) -> ( coll, getPrevState coll state )) (withDefault [] model.collections)
             in
             update (ToggleModal ModalBlacklist)
                 { model
@@ -221,13 +221,13 @@ viewCollectionList : Model -> Html Msg
 viewCollectionList model =
     let
         collections =
-            withDefault model.collections []
+            withDefault [] model.collections
 
         divider =
             List.repeat (List.length collections) (div [ class "h-1.5" ] [ text "" ])
 
-        createCard coll =
-            viewCollectionItem (Tuple.first coll) (Tuple.second coll)
+        createCard ( collection, isChecked ) =
+            viewCollectionItem collection isChecked
 
         collectionCards =
             List.map createCard collections
@@ -281,26 +281,20 @@ viewHeader model =
 
 
 viewSelectTextPreset : Model -> Html Msg
-viewSelectTextPreset model =
+viewSelectTextPreset { sampleTexts } =
     select [ class "select select-md rounded-none", onInput SampleTextSelected ]
         (option [ hidden True ] [ text "Sample Text" ]
-            :: (case model.sampleTexts of
-                    Success res ->
-                        List.map createOption res
-
-                    Loading ->
-                        []
-               )
+            :: List.map createOption (withDefault [] sampleTexts)
         )
 
 
 viewTextArea : Model -> Html Msg
-viewTextArea model =
+viewTextArea { inputText } =
     div [ class "flex relative h-40" ]
         [ textarea
             [ class "grow p-2 text-xl"
             , placeholder "Type something..."
-            , value model.inputText
+            , value inputText
             , onInput SetInputText
             ]
             []
@@ -338,13 +332,13 @@ visibilityOptions =
 
 
 viewVisibilityMenu : Model -> Html Msg
-viewVisibilityMenu model =
+viewVisibilityMenu { visibility } =
     div [ class "flex h-full" ]
-        (List.map (\x -> menuRadio x (model.visibility == Tuple.first x)) visibilityOptions)
+        (List.map (\x -> menuRadio x (visibility == Tuple.first x)) visibilityOptions)
 
 
 menuRadio : ( Visibility, String ) -> Bool -> Html Msg
-menuRadio menu isChecked =
+menuRadio ( isVisible, displayText ) isChecked =
     label
         [ class "flex items-center px-2 text-white font-bold hover:cursor-pointer"
         , classList [ ( "bg-white text-black", isChecked ) ]
@@ -352,14 +346,14 @@ menuRadio menu isChecked =
         [ input
             [ type_ "radio"
             , checked isChecked
-            , onCheck (\_ -> VisibilityChanged (Tuple.first menu))
+            , onCheck (\_ -> VisibilityChanged isVisible)
             , hidden True
             ]
             []
-        , text (Tuple.second menu)
+        , text displayText
         ]
 
 
 createOption : Api.SampleText -> Html Msg
-createOption model =
-    option [ value model.id ] [ text model.title ]
+createOption { id, title } =
+    option [ value id ] [ text title ]
