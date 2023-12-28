@@ -1,8 +1,13 @@
 import './style.css'
 import { Elm } from './Main.elm'
 
+const STORE_KEY = "HZMSTORE";
+const storedData = localStorage.getItem(STORE_KEY);
+const flags = storedData ? JSON.parse(storedData) : null;
+
 const app = Elm.Main.init({
   node: document.querySelector("main"),
+  flags: flags,
 })
 
 app.ports.toggleDialog.subscribe(id => {
@@ -16,4 +21,8 @@ app.ports.toggleDialog.subscribe(id => {
 
 app.ports.storeCollectionsBlacklist.subscribe(collections => {
   localStorage.setItem("collection_blacklist", collections);
+})
+
+app.ports.setStore.subscribe(state => {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
 })

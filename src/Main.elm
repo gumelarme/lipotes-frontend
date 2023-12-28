@@ -7,15 +7,40 @@ import Html exposing (Html, button, div, h2, input, label, option, p, select, sp
 import Html.Attributes exposing (checked, class, classList, hidden, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
+import Json.Decode as D
 import Json.Encode as E
 import List
 import Modal
 import Port
 
 
-main : Program () Model Msg
+type alias Store =
+    { version : Int
+    , blacklistCollection : List String
+    , inputText : String
+    }
+
+
+storeEncoder : Store -> E.Value
+storeEncoder store =
+    E.object
+        [ ( "version", E.int store.version )
+        , ( "blacklistCollection", E.list E.string store.blacklistCollection )
+        , ( "inputText", E.string store.inputText )
+        ]
+
+
+storeDecoder : D.Decoder Store
+storeDecoder =
+    D.map3 Store
+        (D.field "version" D.int)
+        (D.field "blacklistCollection" (D.list D.string))
+        (D.field "inputText" D.string)
+
+
+main : Program E.Value Model Msg
 main =
-    Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
+    Browser.element { init = init, update = updateWithStore, view = view, subscriptions = subscriptions }
 
 
 subscriptions : Model -> Sub Msg
@@ -47,14 +72,24 @@ withDefault defaultValue status =
             defaultValue
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { sampleTexts = Loading
-      , collections = Loading
-      , inputText = ""
-      , visibility = Smart
-      , modalPrevSelectedCollection = Dict.empty
-      }
+init : E.Value -> ( Model, Cmd Msg )
+init value =
+    let
+        initModel =
+            { sampleTexts = Loading
+            , collections = Loading
+            , inputText = ""
+            , visibility = Smart
+            , modalPrevSelectedCollection = Dict.empty
+            }
+    in
+    ( case D.decodeValue storeDecoder value of
+        Ok store ->
+            toModel initModel store
+
+        -- TODO: Handle decoding error
+        Err _ ->
+            initModel
     , Cmd.batch
         [ Api.getSampleTexts GotSampleTexts
         , Api.getCollections GotCollections
@@ -75,6 +110,41 @@ modalIdStr id =
 
         ModalAbout ->
             "about-modal"
+
+
+fromModel : Model -> Store
+fromModel model =
+    { version = 20231228
+    , blacklistCollection =
+        withDefault [] model.collections
+            |> List.filter (\( _, state ) -> state)
+            |> List.unzip
+            |> Tuple.first
+            |> List.map (\x -> x.id)
+    , inputText = model.inputText
+    }
+
+
+toModel : Model -> Store -> Model
+toModel model store =
+    { model
+        | inputText = store.inputText
+        , modalPrevSelectedCollection =
+            store.blacklistCollection
+                |> List.map (\x -> ( x, True ))
+                |> Dict.fromList
+    }
+
+
+updateWithStore : Msg -> Model -> ( Model, Cmd Msg )
+updateWithStore msg model =
+    let
+        ( newModel, cmds ) =
+            update msg model
+    in
+    ( newModel
+    , Cmd.batch [ Port.setStore (storeEncoder (fromModel model)), cmds ]
+    )
 
 
 type Msg
@@ -181,20 +251,10 @@ update msg model =
 
                 previousStates =
                     List.map (\( coll, state ) -> ( coll, getPrevState coll state )) (withDefault [] model.collections)
-
-                idOnly =
-                    withDefault [] model.collections
-                        |> List.filter (\( _, state ) -> state)
-                        |> List.unzip
-                        |> Tuple.first
-                        |> List.map (\x -> x.id)
-
-                encodedCollcetions =
-                    E.encode 0 (E.list E.string idOnly)
             in
             if isOk then
                 update
-                    (ToggleModal ModalBlacklist (Port.storeCollectionsBlacklist encodedCollcetions))
+                    (ToggleModal ModalBlacklist Cmd.none)
                     { model | modalPrevSelectedCollection = Dict.empty }
 
             else
