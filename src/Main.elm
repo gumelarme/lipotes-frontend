@@ -7,6 +7,7 @@ import Html exposing (Html, button, div, h2, input, label, option, p, select, sp
 import Html.Attributes exposing (checked, class, classList, hidden, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
+import Json.Encode as E
 import List
 import Modal
 import Port
@@ -84,7 +85,7 @@ type Msg
     | CollectionSelectionChanged String Bool
     | TriggerAnalyze
     | VisibilityChanged Visibility
-    | ToggleModal ModalId
+    | ToggleModal ModalId (Cmd Msg)
     | OpenBlacklistModal
     | CloseBlacklistModal Bool
 
@@ -133,9 +134,15 @@ update msg model =
         VisibilityChanged visibility ->
             ( { model | visibility = visibility }, Cmd.none )
 
-        ToggleModal modalId ->
-            ( model, Port.toggleDialog (modalIdStr modalId) )
+        ToggleModal modalId doAfter ->
+            ( model
+            , Cmd.batch
+                [ Port.toggleDialog (modalIdStr modalId)
+                , doAfter
+                ]
+            )
 
+        -- ( model, Port.toggleDialog (modalIdStr modalId) )
         GotCollections result ->
             case result of
                 Ok data ->
@@ -165,7 +172,7 @@ update msg model =
                 collectionStates =
                     List.map (Tuple.mapFirst (\x -> x.id)) (withDefault [] model.collections)
             in
-            update (ToggleModal ModalBlacklist) { model | modalPrevSelectedCollection = Dict.fromList collectionStates }
+            update (ToggleModal ModalBlacklist Cmd.none) { model | modalPrevSelectedCollection = Dict.fromList collectionStates }
 
         CloseBlacklistModal isOk ->
             let
@@ -174,17 +181,29 @@ update msg model =
 
                 previousStates =
                     List.map (\( coll, state ) -> ( coll, getPrevState coll state )) (withDefault [] model.collections)
-            in
-            update (ToggleModal ModalBlacklist)
-                { model
-                    | modalPrevSelectedCollection = Dict.empty
-                    , collections =
-                        if not isOk then
-                            Success previousStates
 
-                        else
-                            model.collections
-                }
+                idOnly =
+                    withDefault [] model.collections
+                        |> List.filter (\( _, state ) -> state)
+                        |> List.unzip
+                        |> Tuple.first
+                        |> List.map (\x -> x.id)
+
+                encodedCollcetions =
+                    E.encode 0 (E.list E.string idOnly)
+            in
+            if isOk then
+                update
+                    (ToggleModal ModalBlacklist (Port.storeCollectionsBlacklist encodedCollcetions))
+                    { model | modalPrevSelectedCollection = Dict.empty }
+
+            else
+                update
+                    (ToggleModal ModalBlacklist Cmd.none)
+                    { model
+                        | modalPrevSelectedCollection = Dict.empty
+                        , collections = Success previousStates
+                    }
 
 
 view : Model -> Html Msg
@@ -193,7 +212,7 @@ view model =
         [ viewHeader model
         , div [] [ viewMenu model, viewTextArea model ]
         , modal model ModalBlacklist "Blacklist" viewModalBlacklist (CloseBlacklistModal False)
-        , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout)
+        , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout Cmd.none)
         ]
 
 
@@ -268,7 +287,7 @@ viewHeader model =
         [ div [ class "grow text-2xl font-bold" ] [ text "Hanzi Memo" ]
         , div [ class "flex items-center gap-5" ]
             [ viewSelectTextPreset model
-            , button [ onClick (ToggleModal ModalAbout) ] [ text "About" ]
+            , button [ onClick (ToggleModal ModalAbout Cmd.none) ] [ text "About" ]
             ]
         ]
 

@@ -80,3 +80,8 @@ textDecoder =
             (field "title" string)
             (field "text" string)
         )
+
+
+encodeId : { a | id : String } -> String
+encodeId { id } =
+    id

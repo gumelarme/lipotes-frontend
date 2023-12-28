@@ -13,3 +13,7 @@ app.ports.toggleDialog.subscribe(id => {
     dialog.showModal()
   }
 })
+
+app.ports.storeCollectionsBlacklist.subscribe(collections => {
+  localStorage.setItem("collection_blacklist", collections);
+})
