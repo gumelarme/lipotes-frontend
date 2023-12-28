@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Api
 import Browser
+import Dict exposing (Dict)
 import Html exposing (Html, button, div, form, h2, input, label, node, option, p, select, span, text, textarea)
 import Html.Attributes exposing (checked, class, classList, hidden, id, method, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
@@ -27,6 +28,7 @@ type alias Model =
     , visibility : Visibility
     , sampleTexts : Status (List SampleText)
     , collections : Status (List ( Collection, Bool ))
+    , modalPrevSelectedCollection : Dict String Bool
     }
 
 
@@ -51,6 +53,7 @@ init _ =
       , collections = Loading
       , inputText = ""
       , visibility = Smart
+      , modalPrevSelectedCollection = Dict.empty
       }
     , Cmd.batch [ getSampleTexts, getCollections ]
     )
@@ -80,6 +83,8 @@ type Msg
     | TriggerAnalyze
     | VisibilityChanged Visibility
     | ToggleModal ModalId
+    | OpenBlacklistModal
+    | CloseBlacklistModal Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -153,14 +158,40 @@ update msg model =
             , Cmd.none
             )
 
+        OpenBlacklistModal ->
+            let
+                collectionStates =
+                    List.map (Tuple.mapFirst (\x -> x.id)) (withDefault model.collections [])
+            in
+            update (ToggleModal ModalBlacklist) { model | modalPrevSelectedCollection = Dict.fromList collectionStates }
+
+        CloseBlacklistModal isOk ->
+            let
+                getPrevState { id } state =
+                    Maybe.withDefault state (Dict.get id model.modalPrevSelectedCollection)
+
+                previousStates =
+                    List.map (\( coll, state ) -> ( coll, getPrevState coll state )) (withDefault model.collections [])
+            in
+            update (ToggleModal ModalBlacklist)
+                { model
+                    | modalPrevSelectedCollection = Dict.empty
+                    , collections =
+                        if not isOk then
+                            Success previousStates
+
+                        else
+                            model.collections
+                }
+
 
 view : Model -> Html Msg
 view model =
     div []
         [ viewHeader model
         , div [] [ viewMenu model, viewTextArea model ]
-        , modal model ModalBlacklist "Blacklist" viewModalBlacklist
-        , modal model ModalAbout "About" viewModalAbout
+        , modal model ModalBlacklist "Blacklist" viewModalBlacklist (CloseBlacklistModal False)
+        , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout)
         ]
 
 
@@ -169,26 +200,26 @@ dialog elementId attr content =
     node "dialog" (id elementId :: attr) content
 
 
-modal : Model -> ModalId -> String -> (Model -> Html Msg) -> Html Msg
-modal model modalId title content =
+modal : Model -> ModalId -> String -> (Model -> Html Msg) -> Msg -> Html Msg
+modal model modalId title content onCancel =
     dialog (modalIdStr modalId)
         [ class "modal" ]
         [ form [ method "dialog", class "modal-backdrop" ]
-            [ button [] [ text "close" ] ]
+            [ button [ onClick onCancel ] [ text "close" ] ]
         , div
             [ class "modal-box" ]
-            [ modalControl model modalId title content ]
+            [ modalControl model title content onCancel ]
         ]
 
 
-modalControl : Model -> ModalId -> String -> (Model -> Html Msg) -> Html Msg
-modalControl model modalId title content =
+modalControl : Model -> String -> (Model -> Html Msg) -> Msg -> Html Msg
+modalControl model title content onCancel =
     div [ class "flex flex-col gap-4" ]
         [ div []
             [ h2 [ class "grow font-bold text-2xl" ] [ text title ]
             , button
                 [ class "btn btn-md btn-circle btn-ghost absolute top-3 right-3"
-                , onClick (ToggleModal modalId)
+                , onClick onCancel
                 ]
                 -- Change to icon
                 [ text "X" ]
@@ -203,9 +234,9 @@ viewModalBlacklist model =
         [ div [ class "h-[74vh] overflow-y-scroll" ]
             [ viewCollectionList model ]
         , div [ class "flex gap-2" ]
-            [ button [ class "btn btn-primary", onClick (ToggleModal ModalBlacklist) ]
+            [ button [ class "btn btn-primary", onClick (CloseBlacklistModal True) ]
                 [ text "Ok" ]
-            , button [ class "btn btn-error", onClick (ToggleModal ModalBlacklist) ]
+            , button [ class "btn btn-error", onClick (CloseBlacklistModal False) ]
                 [ text "Cancel" ]
             ]
         ]
@@ -313,7 +344,7 @@ viewMenu model =
 
 viewBlacklistButton : Html Msg
 viewBlacklistButton =
-    button [ class "px-2 bg-white text-black", onClick (ToggleModal ModalBlacklist) ]
+    button [ class "px-2 bg-white text-black", onClick OpenBlacklistModal ]
         [ text "Blacklist" ]
 
 
