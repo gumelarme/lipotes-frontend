@@ -7,7 +7,6 @@ import Html exposing (Html, button, div, h2, input, label, option, p, select, sp
 import Html.Attributes exposing (checked, class, classList, hidden, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
-import Json.Decode exposing (Decoder, field, list, map3, map4, string)
 import List
 import List.Extra
 import Modal
@@ -27,8 +26,8 @@ subscriptions _ =
 type alias Model =
     { inputText : String
     , visibility : Visibility
-    , sampleTexts : Status (List SampleText)
-    , collections : Status (List ( Collection, Bool ))
+    , sampleTexts : Status (List Api.SampleText)
+    , collections : Status (List ( Api.Collection, Bool ))
     , modalPrevSelectedCollection : Dict String Bool
     }
 
@@ -56,7 +55,10 @@ init _ =
       , visibility = Smart
       , modalPrevSelectedCollection = Dict.empty
       }
-    , Cmd.batch [ getSampleTexts, getCollections ]
+    , Cmd.batch
+        [ Api.getSampleTexts GotSampleTexts
+        , Api.getCollections GotCollections
+        ]
     )
 
 
@@ -76,8 +78,8 @@ modalIdStr id =
 
 
 type Msg
-    = GotSampleTexts (Result Http.Error (List SampleText))
-    | GotCollections (Result Http.Error (List Collection))
+    = GotSampleTexts (Result Http.Error (List Api.SampleText))
+    | GotCollections (Result Http.Error (List Api.Collection))
     | SetInputText String
     | SampleTextSelected String
     | CollectionSelectionChanged String Bool
@@ -244,7 +246,7 @@ viewCollectionList model =
                 ]
 
 
-viewCollectionItem : Collection -> Bool -> Html Msg
+viewCollectionItem : Api.Collection -> Bool -> Html Msg
 viewCollectionItem collection state =
     div [ class "flex items-center bg-gray-800 p-4 hover:bg-gray-900 rounded" ]
         [ div [ class "grow flex flex-col" ]
@@ -358,78 +360,6 @@ menuRadio menu isChecked =
         ]
 
 
-createOption : SampleText -> Html Msg
+createOption : Api.SampleText -> Html Msg
 createOption model =
     option [ value model.id ] [ text model.title ]
-
-
-type alias SampleText =
-    { id : String
-    , title : String
-    , text : String
-    }
-
-
-getSampleTexts : Cmd Msg
-getSampleTexts =
-    Http.get
-        { url = Api.endpoint "/texts"
-        , expect = Http.expectJson GotSampleTexts textDecoder
-        }
-
-
-dataDecoder : Decoder a -> Decoder (List a)
-dataDecoder decoder =
-    field "data" (list decoder)
-
-
-textDecoder : Decoder (List SampleText)
-textDecoder =
-    dataDecoder
-        (map3 SampleText
-            (field "id" string)
-            (field "title" string)
-            (field "text" string)
-        )
-
-
-type alias Lexeme =
-    { id : String
-    , zh_sc : String
-    , zh_tc : String
-    , pinyin : String
-    }
-
-
-lexemeDecoder : Decoder Lexeme
-lexemeDecoder =
-    map4 Lexeme
-        (field "id" string)
-        (field "zh_sc" string)
-        (field "zh_tc" string)
-        (field "pinyin" string)
-
-
-type alias Collection =
-    { id : String
-    , name : String
-    , preview : List Lexeme
-    }
-
-
-collectionDecoder : Decoder (List Collection)
-collectionDecoder =
-    dataDecoder
-        (map3 Collection
-            (field "id" string)
-            (field "name" string)
-            (field "preview" (list lexemeDecoder))
-        )
-
-
-getCollections : Cmd Msg
-getCollections =
-    Http.get
-        { url = Api.endpoint "/collections"
-        , expect = Http.expectJson GotCollections collectionDecoder
-        }
