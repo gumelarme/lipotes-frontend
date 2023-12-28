@@ -3,13 +3,14 @@ module Main exposing (..)
 import Api
 import Browser
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, form, h2, input, label, node, option, p, select, span, text, textarea)
-import Html.Attributes exposing (checked, class, classList, hidden, id, method, placeholder, type_, value)
+import Html exposing (Html, button, div, h2, input, label, option, p, select, span, text, textarea)
+import Html.Attributes exposing (checked, class, classList, hidden, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import Json.Decode exposing (Decoder, field, list, map3, map4, string)
 import List
 import List.Extra
+import Modal
 import Port
 
 
@@ -195,37 +196,9 @@ view model =
         ]
 
 
-dialog : String -> List (Html.Attribute msg) -> List (Html msg) -> Html msg
-dialog elementId attr content =
-    node "dialog" (id elementId :: attr) content
-
-
-modal : Model -> ModalId -> String -> (Model -> Html Msg) -> Msg -> Html Msg
-modal model modalId title content onCancel =
-    dialog (modalIdStr modalId)
-        [ class "modal" ]
-        [ form [ method "dialog", class "modal-backdrop" ]
-            [ button [ onClick onCancel ] [ text "close" ] ]
-        , div
-            [ class "modal-box" ]
-            [ modalControl model title content onCancel ]
-        ]
-
-
-modalControl : Model -> String -> (Model -> Html Msg) -> Msg -> Html Msg
-modalControl model title content onCancel =
-    div [ class "flex flex-col gap-4" ]
-        [ div []
-            [ h2 [ class "grow font-bold text-2xl" ] [ text title ]
-            , button
-                [ class "btn btn-md btn-circle btn-ghost absolute top-3 right-3"
-                , onClick onCancel
-                ]
-                -- Change to icon
-                [ text "X" ]
-            ]
-        , content model
-        ]
+modal : a -> ModalId -> String -> (a -> Html msg) -> msg -> Html msg
+modal model modelId =
+    Modal.modal model (modalIdStr modelId)
 
 
 viewModalBlacklist : Model -> Html Msg
