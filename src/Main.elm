@@ -219,8 +219,9 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
+    div [ class "flex flex-col h-screen min-w-[375px]" ]
         [ viewHeader model
+        , div [ class "grow bg-red-900 text-white" ] []
         , div [] [ viewMenu model, viewTextArea model ]
         , modal model ModalBlacklist "Blacklist" viewModalBlacklist (CloseBlacklistModal False)
         , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout)
@@ -235,7 +236,7 @@ modal model modelId =
 viewModalBlacklist : Model -> Html Msg
 viewModalBlacklist model =
     div [ class "flex flex-col gap-4" ]
-        [ div [ class "h-[74vh] overflow-y-scroll" ]
+        [ div [ class "h-[55vh] md:h-[74vh] overflow-y-scroll" ]
             [ viewCollectionList model ]
         , div [ class "flex gap-2" ]
             [ button [ class "btn btn-primary", onClick (CloseBlacklistModal True) ]
@@ -274,7 +275,7 @@ viewCollectionItem : Data.Collection -> Bool -> Html Msg
 viewCollectionItem collection state =
     div [ class "flex items-center bg-gray-800 p-4 hover:bg-gray-900 rounded" ]
         [ div [ class "grow flex flex-col" ]
-            [ h2 [ class "text-2xl" ] [ text collection.name ]
+            [ h2 [ class "text-lg md:text-2xl" ] [ text collection.name ]
             , p [ class "" ] [ text "description" ]
             ]
         , input
@@ -295,18 +296,21 @@ viewModalAbout _ =
 
 viewHeader : Model -> Html Msg
 viewHeader model =
-    div [ class "flex p-2 px-4 bg-blue-800 text-white items-center" ]
-        [ div [ class "grow text-2xl font-bold" ] [ text "Hanzi Memo" ]
-        , div [ class "flex items-center gap-5" ]
+    div [ class "flex p-2 md:px-4 bg-blue-800 text-white items-center" ]
+        [ div [ class "grow text-xl md:text-2xl font-bold" ] [ text "Hanzi Memo" ]
+        , div [ class "flex items-center gap-2 md:gap-5" ]
             [ viewSelectTextPreset model
-            , button [ onClick (ToggleModal ModalAbout) ] [ text "About" ]
+            , button [ onClick (ToggleModal ModalAbout), class "hidden md:block" ] [ text "About" ]
+
+            -- TODO: change to three-vertical-dot icon
+            , button [ onClick (ToggleModal ModalAbout), class "md:hidden" ] [ text "#" ]
             ]
         ]
 
 
 viewSelectTextPreset : Model -> Html Msg
 viewSelectTextPreset { sampleTexts } =
-    select [ class "select select-md rounded-none", onInput SampleTextSelected ]
+    select [ class "select md:select-md rounded-none", onInput SampleTextSelected ]
         (option [ hidden True ] [ text "Sample Text" ]
             :: List.map createOption (withDefault [] sampleTexts)
         )
@@ -328,7 +332,7 @@ viewTextArea { inputText } =
 
 viewMenu : Model -> Html Msg
 viewMenu model =
-    div [ class "flex font-bold text-xl h-12 items-stretch bg-blue-800" ]
+    div [ class "flex font-bold text-sm md:text-xl h-8 md:h-12 items-stretch bg-blue-800" ]
         [ viewBlacklistButton
         , div [ class "grow" ] []
         , viewVisibilityMenu model
@@ -365,7 +369,7 @@ menuRadio : ( Visibility, String ) -> Bool -> Html Msg
 menuRadio ( isVisible, displayText ) isChecked =
     label
         [ class "flex items-center px-2 text-white font-bold hover:cursor-pointer"
-        , classList [ ( "bg-white text-black", isChecked ) ]
+        , classList [ ( "bg-white text-gray-900", isChecked ) ]
         ]
         [ input
             [ type_ "radio"

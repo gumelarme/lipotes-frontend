@@ -26,7 +26,7 @@ modalControl : a -> String -> (a -> Html msg) -> msg -> Html msg
 modalControl model title content onCancel =
     div [ class "flex flex-col gap-4" ]
         [ div []
-            [ h2 [ class "grow font-bold text-2xl" ] [ text title ]
+            [ h2 [ class "grow font-bold text-xl md:text-2xl" ] [ text title ]
             , button
                 [ class "btn btn-md btn-circle btn-ghost absolute top-3 right-3"
                 , onClick onCancel
