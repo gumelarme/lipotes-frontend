@@ -8,7 +8,6 @@ import Html.Attributes exposing (checked, class, classList, hidden, id, placehol
 import Html.Events exposing (onCheck, onClick, onInput)
 import Http
 import List
-import List.Extra
 import Modal
 import Port
 
@@ -223,21 +222,15 @@ viewCollectionList model =
         collections =
             withDefault [] model.collections
 
-        divider =
-            List.repeat (List.length collections) (div [ class "h-1.5" ] [ text "" ])
-
         createCard ( collection, isChecked ) =
             viewCollectionItem collection isChecked
 
         collectionCards =
             List.map createCard collections
-
-        combined =
-            List.Extra.interweave collectionCards divider
     in
     case model.collections of
         Success _ ->
-            div [] (List.take (List.length combined - 1) combined)
+            div [ class "flex flex-col gap-1.5" ] collectionCards
 
         Loading ->
             div [ class "h-full w-full flex flex-col gap-4 justify-center items-center" ]
