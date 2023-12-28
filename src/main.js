@@ -19,10 +19,6 @@ app.ports.toggleDialog.subscribe(id => {
   }
 })
 
-app.ports.storeCollectionsBlacklist.subscribe(collections => {
-  localStorage.setItem("collection_blacklist", collections);
-})
-
 app.ports.setStore.subscribe(state => {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
 })

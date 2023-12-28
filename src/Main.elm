@@ -2,7 +2,6 @@ module Main exposing (..)
 
 import Api
 import Browser
-import Dict exposing (Dict)
 import Html exposing (Html, button, div, h2, input, label, option, p, select, span, text, textarea)
 import Html.Attributes exposing (checked, class, classList, hidden, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
@@ -12,6 +11,7 @@ import Json.Encode as E
 import List
 import Modal
 import Port
+import Set exposing (Set)
 
 
 type alias Store =
@@ -52,8 +52,9 @@ type alias Model =
     { inputText : String
     , visibility : Visibility
     , sampleTexts : Status (List Api.SampleText)
-    , collections : Status (List ( Api.Collection, Bool ))
-    , modalPrevSelectedCollection : Dict String Bool
+    , collections : Status (List Api.Collection)
+    , selectedCollections : Set String
+    , tempSelectedCollections : Set String
     }
 
 
@@ -80,7 +81,8 @@ init value =
             , collections = Loading
             , inputText = ""
             , visibility = Smart
-            , modalPrevSelectedCollection = Dict.empty
+            , selectedCollections = Set.empty
+            , tempSelectedCollections = Set.empty
             }
     in
     ( case D.decodeValue storeDecoder value of
@@ -115,12 +117,7 @@ modalIdStr id =
 fromModel : Model -> Store
 fromModel model =
     { version = 20231228
-    , blacklistCollection =
-        withDefault [] model.collections
-            |> List.filter (\( _, state ) -> state)
-            |> List.unzip
-            |> Tuple.first
-            |> List.map (\x -> x.id)
+    , blacklistCollection = Set.toList model.selectedCollections
     , inputText = model.inputText
     }
 
@@ -129,10 +126,7 @@ toModel : Model -> Store -> Model
 toModel model store =
     { model
         | inputText = store.inputText
-        , modalPrevSelectedCollection =
-            store.blacklistCollection
-                |> List.map (\x -> ( x, True ))
-                |> Dict.fromList
+        , selectedCollections = Set.fromList store.blacklistCollection
     }
 
 
@@ -143,7 +137,7 @@ updateWithStore msg model =
             update msg model
     in
     ( newModel
-    , Cmd.batch [ Port.setStore (storeEncoder (fromModel model)), cmds ]
+    , Cmd.batch [ Port.setStore (storeEncoder (fromModel newModel)), cmds ]
     )
 
 
@@ -155,7 +149,7 @@ type Msg
     | CollectionSelectionChanged String Bool
     | TriggerAnalyze
     | VisibilityChanged Visibility
-    | ToggleModal ModalId (Cmd Msg)
+    | ToggleModal ModalId
     | OpenBlacklistModal
     | CloseBlacklistModal Bool
 
@@ -204,66 +198,46 @@ update msg model =
         VisibilityChanged visibility ->
             ( { model | visibility = visibility }, Cmd.none )
 
-        ToggleModal modalId doAfter ->
-            ( model
-            , Cmd.batch
-                [ Port.toggleDialog (modalIdStr modalId)
-                , doAfter
-                ]
-            )
+        ToggleModal modalId ->
+            ( model, Port.toggleDialog (modalIdStr modalId) )
 
         -- ( model, Port.toggleDialog (modalIdStr modalId) )
         GotCollections result ->
             case result of
                 Ok data ->
-                    ( { model | collections = Success (List.map (\x -> ( x, False )) data) }, Cmd.none )
+                    ( { model | collections = Success data }, Cmd.none )
 
                 Err _ ->
                     ( { model | collections = Loading }, Cmd.none )
 
         CollectionSelectionChanged collId isChecked ->
             let
-                collections =
-                    withDefault [] model.collections
-
-                toggleStatus pair =
-                    if (Tuple.first pair).id == collId then
-                        ( Tuple.first pair, isChecked )
+                operation =
+                    if isChecked then
+                        Set.insert
 
                     else
-                        pair
+                        Set.remove
             in
-            ( { model | collections = Success (List.map toggleStatus collections) }
-            , Cmd.none
-            )
+            ( { model | selectedCollections = operation collId model.selectedCollections }, Cmd.none )
 
         OpenBlacklistModal ->
-            let
-                collectionStates =
-                    List.map (Tuple.mapFirst (\x -> x.id)) (withDefault [] model.collections)
-            in
-            update (ToggleModal ModalBlacklist Cmd.none) { model | modalPrevSelectedCollection = Dict.fromList collectionStates }
+            update
+                (ToggleModal ModalBlacklist)
+                { model | tempSelectedCollections = model.selectedCollections }
 
         CloseBlacklistModal isOk ->
-            let
-                getPrevState { id } state =
-                    Maybe.withDefault state (Dict.get id model.modalPrevSelectedCollection)
+            update
+                (ToggleModal ModalBlacklist)
+                { model
+                    | tempSelectedCollections = Set.empty
+                    , selectedCollections =
+                        if isOk then
+                            model.selectedCollections
 
-                previousStates =
-                    List.map (\( coll, state ) -> ( coll, getPrevState coll state )) (withDefault [] model.collections)
-            in
-            if isOk then
-                update
-                    (ToggleModal ModalBlacklist Cmd.none)
-                    { model | modalPrevSelectedCollection = Dict.empty }
-
-            else
-                update
-                    (ToggleModal ModalBlacklist Cmd.none)
-                    { model
-                        | modalPrevSelectedCollection = Dict.empty
-                        , collections = Success previousStates
-                    }
+                        else
+                            model.tempSelectedCollections
+                }
 
 
 view : Model -> Html Msg
@@ -272,7 +246,7 @@ view model =
         [ viewHeader model
         , div [] [ viewMenu model, viewTextArea model ]
         , modal model ModalBlacklist "Blacklist" viewModalBlacklist (CloseBlacklistModal False)
-        , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout Cmd.none)
+        , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout)
         ]
 
 
@@ -300,6 +274,7 @@ viewCollectionList model =
     let
         collections =
             withDefault [] model.collections
+                |> List.map (\coll -> ( coll, Set.member coll.id model.selectedCollections ))
 
         createCard ( collection, isChecked ) =
             viewCollectionItem collection isChecked
@@ -347,7 +322,7 @@ viewHeader model =
         [ div [ class "grow text-2xl font-bold" ] [ text "Hanzi Memo" ]
         , div [ class "flex items-center gap-5" ]
             [ viewSelectTextPreset model
-            , button [ onClick (ToggleModal ModalAbout Cmd.none) ] [ text "About" ]
+            , button [ onClick (ToggleModal ModalAbout) ] [ text "About" ]
             ]
         ]
 
