@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Api
 import Browser
+import Data
 import Html exposing (Html, button, div, h2, input, label, option, p, select, span, text, textarea)
 import Html.Attributes exposing (checked, class, classList, hidden, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
@@ -12,30 +13,6 @@ import List
 import Modal
 import Port
 import Set exposing (Set)
-
-
-type alias Store =
-    { version : Int
-    , blacklistCollection : List String
-    , inputText : String
-    }
-
-
-storeEncoder : Store -> E.Value
-storeEncoder store =
-    E.object
-        [ ( "version", E.int store.version )
-        , ( "blacklistCollection", E.list E.string store.blacklistCollection )
-        , ( "inputText", E.string store.inputText )
-        ]
-
-
-storeDecoder : D.Decoder Store
-storeDecoder =
-    D.map3 Store
-        (D.field "version" D.int)
-        (D.field "blacklistCollection" (D.list D.string))
-        (D.field "inputText" D.string)
 
 
 main : Program E.Value Model Msg
@@ -51,8 +28,8 @@ subscriptions _ =
 type alias Model =
     { inputText : String
     , visibility : Visibility
-    , sampleTexts : Status (List Api.SampleText)
-    , collections : Status (List Api.Collection)
+    , sampleTexts : Status (List Data.SampleText)
+    , collections : Status (List Data.Collection)
     , selectedCollections : Set String
     , tempSelectedCollections : Set String
     }
@@ -85,7 +62,7 @@ init value =
             , tempSelectedCollections = Set.empty
             }
     in
-    ( case D.decodeValue storeDecoder value of
+    ( case D.decodeValue Data.storeDecoder value of
         Ok store ->
             toModel initModel store
 
@@ -114,7 +91,7 @@ modalIdStr id =
             "about-modal"
 
 
-fromModel : Model -> Store
+fromModel : Model -> Data.Store
 fromModel model =
     { version = 20231228
     , blacklistCollection = Set.toList model.selectedCollections
@@ -122,7 +99,7 @@ fromModel model =
     }
 
 
-toModel : Model -> Store -> Model
+toModel : Model -> Data.Store -> Model
 toModel model store =
     { model
         | inputText = store.inputText
@@ -137,13 +114,13 @@ updateWithStore msg model =
             update msg model
     in
     ( newModel
-    , Cmd.batch [ Port.setStore (storeEncoder (fromModel newModel)), cmds ]
+    , Cmd.batch [ Port.setStore (Data.storeEncoder (fromModel newModel)), cmds ]
     )
 
 
 type Msg
-    = GotSampleTexts (Result Http.Error (List Api.SampleText))
-    | GotCollections (Result Http.Error (List Api.Collection))
+    = GotSampleTexts (Result Http.Error (List Data.SampleText))
+    | GotCollections (Result Http.Error (List Data.Collection))
     | SetInputText String
     | SampleTextSelected String
     | CollectionSelectionChanged String Bool
@@ -293,7 +270,7 @@ viewCollectionList model =
                 ]
 
 
-viewCollectionItem : Api.Collection -> Bool -> Html Msg
+viewCollectionItem : Data.Collection -> Bool -> Html Msg
 viewCollectionItem collection state =
     div [ class "flex items-center bg-gray-800 p-4 hover:bg-gray-900 rounded" ]
         [ div [ class "grow flex flex-col" ]
@@ -401,6 +378,6 @@ menuRadio ( isVisible, displayText ) isChecked =
         ]
 
 
-createOption : Api.SampleText -> Html Msg
+createOption : Data.SampleText -> Html Msg
 createOption { id, title } =
     option [ value id ] [ text title ]
