@@ -35,8 +35,34 @@ type alias Model =
     }
 
 
+type alias ErrorMessage =
+    { message : String
+    , resolution : String
+    }
+
+
+friendlyHttpError : Http.Error -> ErrorMessage
+friendlyHttpError error =
+    case error of
+        Http.NetworkError ->
+            { message = "You seems to be offline."
+            , resolution = "Check your internet connection and try again."
+            }
+
+        Http.Timeout ->
+            { message = "The server took too long to respond."
+            , resolution = "Please try again in a few moments."
+            }
+
+        _ ->
+            { message = "Somethings wrong."
+            , resolution = "Try reloading the page."
+            }
+
+
 type Status a
     = Loading
+    | Failed ErrorMessage
     | Success a
 
 
@@ -141,7 +167,7 @@ update msg model =
                         Success texts ->
                             List.filter (\x -> x.id == key) texts
 
-                        Loading ->
+                        _ ->
                             []
 
                 text =
@@ -162,8 +188,8 @@ update msg model =
                 Ok data ->
                     ( { model | sampleTexts = Success data }, Cmd.none )
 
-                Err _ ->
-                    ( { model | sampleTexts = Loading }, Cmd.none )
+                Err err ->
+                    ( { model | sampleTexts = Failed (friendlyHttpError err) }, Cmd.none )
 
         TriggerAnalyze ->
             let
@@ -178,14 +204,13 @@ update msg model =
         ToggleModal modalId ->
             ( model, Port.toggleDialog (modalIdStr modalId) )
 
-        -- ( model, Port.toggleDialog (modalIdStr modalId) )
         GotCollections result ->
             case result of
                 Ok data ->
                     ( { model | collections = Success data }, Cmd.none )
 
-                Err _ ->
-                    ( { model | collections = Loading }, Cmd.none )
+                Err err ->
+                    ( { model | collections = Failed (friendlyHttpError err) }, Cmd.none )
 
         CollectionSelectionChanged collId isChecked ->
             let
@@ -250,24 +275,31 @@ viewModalBlacklist model =
 viewCollectionList : Model -> Html Msg
 viewCollectionList model =
     let
-        collections =
-            withDefault [] model.collections
-                |> List.map (\coll -> ( coll, Set.member coll.id model.selectedCollections ))
+        mapSelected coll =
+            coll
+                |> List.map (\c -> ( c, Set.member c.id model.selectedCollections ))
 
         createCard ( collection, isChecked ) =
             viewCollectionItem collection isChecked
 
-        collectionCards =
-            List.map createCard collections
+        container attr content =
+            div (class "h-full w-full flex flex-col justify-center items-center" :: attr) content
     in
     case model.collections of
-        Success _ ->
-            div [ class "flex flex-col gap-1.5" ] collectionCards
+        Success coll ->
+            div [ class "flex flex-col gap-1.5" ] (List.map createCard (mapSelected coll))
 
         Loading ->
-            div [ class "h-full w-full flex flex-col gap-4 justify-center items-center" ]
+            container [ class "gap-4" ]
                 [ span [ class "loading loading-spinner text-primary loading-lg" ] []
                 , span [ class "text-xl" ] [ text "Loading..." ]
+                ]
+
+        Failed err ->
+            container [ class "gap-1" ]
+                [ span [ class "text-3xl font-bold text-error" ] [ text "Error" ]
+                , span [ class "text-xl text-error" ] [ text err.message ]
+                , span [ class "text-xl text-error" ] [ text err.resolution ]
                 ]
 
 
