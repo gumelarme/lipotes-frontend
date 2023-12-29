@@ -162,23 +162,21 @@ update msg model =
     case msg of
         SampleTextSelected key ->
             let
-                sampleText =
-                    case model.sampleTexts of
-                        Success texts ->
-                            List.filter (\x -> x.id == key) texts
-
-                        _ ->
-                            []
-
-                text =
-                    case List.head sampleText of
-                        Just a ->
-                            a.text
+                getTextIfAny maybeSampleText =
+                    case maybeSampleText of
+                        Just val ->
+                            val.text
 
                         Nothing ->
                             ""
+
+                selected =
+                    withDefault [] model.sampleTexts
+                        |> List.filter (\x -> x.id == key)
+                        |> List.head
+                        |> getTextIfAny
             in
-            update (SetInputText text) model
+            update (SetInputText selected) model
 
         SetInputText text ->
             ( { model | inputText = text }, Cmd.none )
