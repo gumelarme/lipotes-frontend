@@ -243,9 +243,12 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div [ class "flex flex-col h-screen min-w-[375px]" ]
-        [ viewHeader model
+        [ viewHeader model.sampleTexts
         , div [ class "grow bg-red-900 text-white" ] []
-        , div [] [ viewMenu model, viewTextArea model ]
+        , div []
+            [ viewMenu model.visibility
+            , viewTextArea model.inputText
+            ]
         , modal model ModalBlacklist "Blacklist" viewModalBlacklist (CloseBlacklistModal False)
         , modal model ModalAbout "About" viewModalAbout (ToggleModal ModalAbout)
         ]
@@ -260,7 +263,7 @@ viewModalBlacklist : Model -> Html Msg
 viewModalBlacklist model =
     div [ class "flex flex-col gap-4" ]
         [ div [ class "h-[55vh] md:h-[74vh] overflow-y-scroll" ]
-            [ viewCollectionList model ]
+            [ viewCollectionList model.collections model.selectedCollections ]
         , div [ class "flex gap-2" ]
             [ button [ class "btn btn-primary", onClick (CloseBlacklistModal True) ]
                 [ text "Ok" ]
@@ -270,20 +273,20 @@ viewModalBlacklist model =
         ]
 
 
-viewCollectionList : Model -> Html Msg
-viewCollectionList model =
+viewCollectionList : Status (List Data.Collection) -> Set String -> Html Msg
+viewCollectionList collections selectedCollections =
     let
         mapSelected coll =
             coll
-                |> List.map (\c -> ( c, Set.member c.id model.selectedCollections ))
+                |> List.map (\c -> ( c, Set.member c.id selectedCollections ))
 
-        createCard ( collection, isChecked ) =
-            viewCollectionItem collection isChecked
+        createCard ( coll, isChecked ) =
+            viewCollectionItem coll isChecked
 
         container attr content =
             div (class "h-full w-full flex flex-col justify-center items-center" :: attr) content
     in
-    case model.collections of
+    case collections of
         Success coll ->
             div [ class "flex flex-col gap-1.5" ] (List.map createCard (mapSelected coll))
 
@@ -324,12 +327,12 @@ viewModalAbout _ =
         [ text "About us" ]
 
 
-viewHeader : Model -> Html Msg
-viewHeader model =
+viewHeader : Status (List Data.SampleText) -> Html Msg
+viewHeader sampleTexts =
     div [ class "flex p-2 md:px-4 bg-blue-800 text-white items-center" ]
         [ div [ class "grow text-xl md:text-2xl font-bold" ] [ text "Hanzi Memo" ]
         , div [ class "flex items-center gap-2 md:gap-5" ]
-            [ viewSelectTextPreset model
+            [ viewSelectTextPreset sampleTexts
             , button [ onClick (ToggleModal ModalAbout), class "hidden md:block" ] [ text "About" ]
 
             -- TODO: change to three-vertical-dot icon
@@ -338,16 +341,16 @@ viewHeader model =
         ]
 
 
-viewSelectTextPreset : Model -> Html Msg
-viewSelectTextPreset { sampleTexts } =
+viewSelectTextPreset : Status (List Data.SampleText) -> Html Msg
+viewSelectTextPreset sampleTexts =
     select [ class "select md:select-md rounded-none", onInput SampleTextSelected ]
         (option [ hidden True ] [ text "Sample Text" ]
             :: List.map createOption (withDefault [] sampleTexts)
         )
 
 
-viewTextArea : Model -> Html Msg
-viewTextArea { inputText } =
+viewTextArea : String -> Html Msg
+viewTextArea inputText =
     div [ class "flex relative h-40" ]
         [ textarea
             [ class "grow p-2 text-xl"
@@ -360,12 +363,12 @@ viewTextArea { inputText } =
         ]
 
 
-viewMenu : Model -> Html Msg
-viewMenu model =
+viewMenu : Visibility -> Html Msg
+viewMenu visibility =
     div [ class "flex font-bold text-sm md:text-xl h-8 md:h-12 items-stretch bg-blue-800" ]
         [ viewBlacklistButton
         , div [ class "grow" ] []
-        , viewVisibilityMenu model
+        , viewVisibilityMenu visibility
         ]
 
 
@@ -389,10 +392,10 @@ visibilityOptions =
     ]
 
 
-viewVisibilityMenu : Model -> Html Msg
-viewVisibilityMenu { visibility } =
+viewVisibilityMenu : Visibility -> Html Msg
+viewVisibilityMenu curVisibility =
     div [ class "flex h-full" ]
-        (List.map (\x -> menuRadio x (visibility == Tuple.first x)) visibilityOptions)
+        (List.map (\x -> menuRadio x (curVisibility == Tuple.first x)) visibilityOptions)
 
 
 menuRadio : ( Visibility, String ) -> Bool -> Html Msg
