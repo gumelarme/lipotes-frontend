@@ -190,10 +190,6 @@ update msg model =
                     ( { model | sampleTexts = Failed (friendlyHttpError err) }, Cmd.none )
 
         TriggerAnalyze ->
-            let
-                _ =
-                    Debug.log model.inputText ""
-            in
             ( model, Cmd.none )
 
         VisibilityChanged visibility ->
@@ -330,7 +326,7 @@ viewModalAbout _ =
 viewHeader : Status (List Data.SampleText) -> Html Msg
 viewHeader sampleTexts =
     div [ class "flex p-2 md:px-4 bg-blue-800 text-white items-center" ]
-        [ div [ class "grow text-xl md:text-2xl font-bold" ] [ text "Hanzi Memo" ]
+        [ div [ class "grow text-xl md:text-2xl font-bold" ] [ text "Lipotes" ]
         , div [ class "flex items-center gap-2 md:gap-5" ]
             [ viewSelectTextPreset sampleTexts
             , button [ onClick (ToggleModal ModalAbout), class "hidden md:block" ] [ text "About" ]
